@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+		<title>Post-it position</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<style>
+			body, html {
+				margin:0;
+				padding:0;
+				font-family:Arial;
+			}
+			
+			#main {
+				width:1000px;
+				padding:20px;
+				margin:auto;
+			}
+			.heatmapArea {
+				position: absolute;
+				border:1px dashed black;
+			}
+			.label{
+				position:absolute;
+				bottom: 2px;
+				right: 2px;
+				font-size: 80%;
+			}
+			.percent{
+				position:absolute;
+				top: 2px;
+				right: 2px;
+				font-size: 80%;
+			}
+
+			#bmc{
+				position: relative;
+				height: 650px;
+			}
+
+			#vpc{
+				position: relative;
+				height: 500px;
+			}
+			
+			#misc .heatmapArea{
+				position:relative;
+				float:left;
+			}
+			
+			
+		</style>
+	</head>
+	<body>
+	<div id="main">
+		<h1>Post-it position</h1>
+		<p>Data is from top left corner of a postit. Max: indicates maxium number of post-it at same position.</p>
+		<h2>Business Model Canvas, post-its: <span id="bmc_total"></span></h2>
+		<div id="bmc">
+		</div>
+		<h2>Value Proposition Canvas, post-its: <span id="vpc_total"></span></h2>
+		<div id="vpc">
+		</div>
+		<div id="misc">
+		</div>
+	</div>
+		<script type="text/javascript" src="lib/jquery-2.0.0.min.js"></script>
+		<script type="text/javascript" src="lib/jquery.csv-0.71.min.js"></script>
+		<script type="text/javascript" src="lib/heatmap.js"></script>
+		<script type="text/javascript">
+
+//http://www.mredkj.com/javascript/numberFormat.html
+function addCommas(nStr)
+{
+	nStr += '';
+	x = nStr.split('.');
+	x1 = x[0];
+	x2 = x.length > 1 ? '.' + x[1] : '';
+	var rgx = /(\d+)(\d{3})/;
+	while (rgx.test(x1)) {
+		x1 = x1.replace(rgx, '$1' + ',' + '$2');
+	}
+	return x1 + x2;
+}		
+		
+window.onload = function(){
+	var bmc = {
+		width: 1000,
+		height: 600
+	};
+	var vpc = {
+		width: 600,
+		height: 450
+	}
+	var sizes = {
+		'partner_network':{
+			width: bmc.width/5,
+			height: bmc.height/3*2,
+			top:0,
+			left:0,
+			canvas: 'bmc'
+		},
+		'key_activities':{
+			width: bmc.width/5,
+			height: bmc.height/3,
+			top:0,
+			left: bmc.width/5,
+			canvas: 'bmc'
+		},
+		'key_resources':{
+			width: bmc.width/5,
+			height: bmc.height/3,
+			top:bmc.height/3,
+			left: bmc.width/5,
+			canvas: 'bmc'
+		},
+		'cost_structure':{
+			width: bmc.width/2,
+			height: bmc.height/3,
+			top:bmc.height/3*2,
+			left:0,
+			canvas: 'bmc'
+		},
+		'value_proposition':{
+			width: bmc.width/5,
+			height: bmc.height/3*2,
+			top:0,
+			left:bmc.width/5*2,
+			canvas: 'bmc'
+		},
+		'customer_segments':{
+			width: bmc.width/5,
+			height: bmc.height/3*2,
+			top:0,
+			left:bmc.width/5*4,
+			canvas: 'bmc'
+		},
+		'customer_relationship':{
+			width: bmc.width/5,
+			height: bmc.height/3,
+			top:0,
+			left:bmc.width/5*3,
+			canvas: 'bmc'
+		},
+		'channels':{
+			width: bmc.width/5,
+			height: bmc.height/3,
+			top:bmc.height/3,
+			left:bmc.width/5*3,
+			canvas: 'bmc'
+		},
+		'revenue_streams':{
+			width: bmc.width/2,
+			height: bmc.height/3,
+			top:bmc.height/3*2,
+			left:bmc.width/2,
+			canvas: 'bmc'
+		},
+		'key_partners':{
+			width: vpc.width/4,
+			height: vpc.height,
+			top: 0,
+			left: 0,
+			canvas: 'vpc'
+		},
+		'gain_creators':{
+			width: vpc.width/4,
+			height: vpc.height/2,
+			top: 0,
+			left: vpc.width/4,
+			canvas: 'vpc'
+		},
+		'pain_relievers':{
+			width: vpc.width/4,
+			height: vpc.height/2,
+			top: vpc.height/2,
+			left: vpc.width/4,
+			canvas: 'vpc'
+		},
+		'gains':{
+			width: vpc.width/4,
+			height: vpc.height/2,
+			top: 0,
+			left: vpc.width/4*2,
+			canvas: 'vpc'
+		},
+		'pains':{
+			width: vpc.width/4,
+			height: vpc.height/2,
+			top: vpc.height/2,
+			left: vpc.width/4*2,
+			canvas: 'vpc'
+		},
+		'jobs':{
+			width: vpc.width/4,
+			height: vpc.height,
+			top: 0,
+			left: vpc.width/4*3,
+			canvas: 'vpc'
+		}
+	};
+
+
+	$.get('post_it_position.csv', function(csv){
+		var data = $.csv.toObjects(csv);
+		var current_block= "";
+		var max=0;
+		var current_data=[];
+		var heatmap;
+		var config;
+		var $map;
+		var point;
+		var b;
+		var $b;
+		var total={'vpc':0, 'bmc':0, 'misc':0};
+		var current_total = 0;
+		var queue = {'vpc':[], 'bmc':[], 'misc':[]};
+		for(var i=0; i < data.length; i++){
+			point = data[i];
+			b = sizes[current_block] || {width:100, height:100, canvas:'misc'};
+			point.x*=b.width/100;
+			point.y*=b.height/100;
+			total[b.canvas]+=Number(point.count);
+			current_total +=Number(point.count);
+			max = point.count > max ? Number(point.count) : max;
+			if(current_block != "" && point.block != current_block || i==data.length-1){
+				//draw current_block
+				
+				$map = $('<div class="heatmapArea"><div class="label">' + current_block + ' (max: '+max+')</div></div>').
+					css(b)
+					.appendTo('#' + b.canvas);
+				
+				var make = function(m, c){
+					return function(total){
+						m.append('<div class="percent">n: '+ (c / total*100).toFixed(0) +'%</div>');
+					}
+				};
+				
+				queue[b.canvas].push(make($map, current_total));
+				
+				config = {
+					"radius": 5,
+					"element": $map[0],
+					"visible": true,
+					"opacity": 40,
+					"gradient": { 0.45: "rgb(0,0,255)", 0.55: "rgb(0,255,255)", 0.65: "rgb(0,255,0)", 0.95: "yellow", 1.0: "rgb(255,0,0)" }
+				};
+				heatmap = heatmapFactory.create(config);
+				heatmap.store.setDataSet({ max: max, data:  current_data});				
+				max=0;
+				current_total = 0;
+				current_data=[];
+			}
+			current_data.push(point);
+			current_block = point.block;
+		}
+		for(var key in total){
+			$('#'+key+'_total').text(addCommas(total[key]));
+			queue[key].forEach(function(f, index){
+				f(total[key]);
+			});
+		}
+		
+	});
+
+};
+		</script>
+	</body>
+</html>
